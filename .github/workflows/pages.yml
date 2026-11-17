@@ -1,12 +1,12 @@
-name: Deploy InThisTown to GitHub Pages
+
+name: Deploy In This Town
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - "InThisTown_Browser_v0.4.7 (1).zip"
-      - ".github/workflows/pages.yml"
+      - 'InThisTown_Browser_v*.zip'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -15,50 +15,48 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
-
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Pages
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-
+      - name: Find newest app archive
+        id: archive
+        shell: bash
+        run: |
+          ZIP="$(find . -maxdepth 1 -type f -name 'InThisTown_Browser_v*.zip' -printf '%f\n' | sort -V | tail -n 1)"
+          test -n "$ZIP"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "Publishing $ZIP"
       - name: Extract application
         run: |
-          mkdir extracted
-          unzip -q "InThisTown_Browser_v0.4.7 (1).zip" -d extracted
-
-      - name: Prepare website
-        run: |
-          mkdir public
-          if [ -d "extracted/site" ]; then
-            cp -r extracted/site/. public/
-          else
-            cp -r extracted/. public/
-          fi
-
+          mkdir -p extracted public
+          unzip -q -o "${{ steps.archive.outputs.zip }}" -d extracted
+          cp -R extracted/site/. public/
           test -f public/index.html
-
+          test -f public/kokoro-worker.js
+          test -f public/engine/renderer.js
+          test -f public/engine/asset_forge.js
+          test -f public/engine/assets.js
+          test -f public/story-engine.js
+          test -f public/story-plan-adapter.js
+          test -f public/shortform-director.js
+          test -f public/episode-preflight.js
+          test -f public/timing.js
+          test -f public/sfx.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: public
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
